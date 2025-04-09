@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แปลงเสียงเป็นข้อความ | Speech to Text</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans Thai', sans-serif;
+        }
+        
+        .waveform {
+            background: linear-gradient(90deg, #3b82f6 0%, #3b82f6 var(--progress, 0%), #e5e7eb var(--progress, 0%), #e5e7eb 100%);
+        }
+        
+        .subtitle-line {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header Section -->
+        <header class="text-center mb-12">
+            <div class="flex justify-center mb-4">
+                <div class="bg-blue-100 p-4 rounded-full">
+                    <i class="fas fa-microphone-alt text-blue-600 text-4xl"></i>
+                </div>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">แปลงเสียงเป็นข้อความ</h1>
+            <p class="text-gray-600">บริการแปลงไฟล์เสียงหรือพูดสดเป็นข้อความภาษาไทยอย่างแม่นยำ</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
+            <!-- Tab Navigation -->
+            <div class="flex border-b">
+                <button id="recordTab" class="flex-1 py-4 px-6 text-center font-medium text-blue-600 border-b-2 border-blue-600">
+                    <i class="fas fa-microphone mr-2"></i>บันทึกเสียง
+                </button>
+                <button id="uploadTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-upload mr-2"></i>อัปโหลดไฟล์
+                </button>
+            </div>
+
+            <!-- Record Panel -->
+            <div id="recordPanel" class="p-6">
+                <div class="mb-6">
+                    <div class="waveform h-16 rounded-lg mb-2" id="waveform"></div>
+                    <div class="flex justify-between text-sm text-gray-500">
+                        <span id="currentTime">00:00</span>
+                        <span id="duration">00:00</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-center mb-6">
+                    <button id="recordBtn" class="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-8 rounded-full flex items-center transition-all">
+                        <i class="fas fa-microphone mr-2"></i>
+                        <span>เริ่มบันทึกเสียง</span>
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 pt-1">
+                            <i class="fas fa-info-circle text-blue-500"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-blue-800">เคล็ดลับการใช้งาน</h3>
+                            <div class="mt-1 text-sm text-blue-700">
+                                <p>• พูดชัดเจนในสภาพแวดล้อมที่เงียบ</p>
+                                <p>• ใช้ไมโครโฟนคุณภาพดีเพื่อผลลัพธ์ที่ดีที่สุด</p>
+                                <p>• ระยะเวลาบันทึกสูงสุด 15 นาทีต่อครั้ง</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Panel (Hidden by default) -->
+            <div id="uploadPanel" class="p-6 hidden">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-700 mb-2">ลากไฟล์เสียงมาวางที่นี่</h3>
+                    <p class="text-gray-500 mb-4">หรือ</p>
+                    <label for="fileInput" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md cursor-pointer transition-colors">
+                        <i class="fas fa-folder-open mr-2"></i>
+                        เลือกไฟล์จากคอมพิวเตอร์
+                    </label>
+                    <input type="file" id="fileInput" class="hidden" accept=".mp3,.wav,.ogg,.m4a">
+                </div>
+
+                <div id="fileInfo" class="bg-gray-100 rounded-lg p-4 mb-4 hidden">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-audio text-blue-500 text-xl mr-3"></i>
+                            <div>
+                                <h4 class="font-medium text-gray-800" id="fileName">ไฟล์เสียง.mp3</h4>
+                                <p class="text-sm text-gray-500" id="fileSize">3.2 MB</p>
+                            </div>
+                        </div>
+                        <button id="cancelUpload" class="text-red-500 hover:text-red-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="uploadProgress" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 pt-1">
+                            <i class="fas fa-exclamation-circle text-yellow-500"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-yellow-800">ข้อกำหนดไฟล์เสียง</h3>
+                            <div class="mt-1 text-sm text-yellow-700">
+                                <p>• รองรับไฟล์: MP3, WAV, OGG, M4A</p>
+                                <p>• ขนาดไฟล์ไม่เกิน 10 MB</p>
+                                <p>• ความยาวไม่เกิน 15 นาที</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="border-b px-6 py-4">
+                <h2 class="text-lg font-medium text-gray-800 flex items-center">
+                    <i class="fas fa-align-left text-blue-500 mr-2"></i>
+                    ข้อความที่แปลงแล้ว
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex space-x-2">
+                        <button id="copyText" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm flex items-center">
+                            <i class="fas fa-copy mr-1"></i> คัดลอก
+                        </button>
+                        <button id="downloadText" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm flex items-center">
+                            <i class="fas fa-download mr-1"></i> ดาวน์โหลด
+                        </button>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <span id="wordCount">0</span> คำ
+                    </div>
+                </div>
+
+                <div id="resultContainer" class="bg-gray-50 border border-gray-200 rounded-lg p-4 min-h-48">
+                    <div id="placeholderText" class="text-center text-gray-400 py-12">
+                        <i class="fas fa-comment-dots text-3xl mb-3"></i>
+                        <p>ผลลัพธ์จะแสดงที่นี่หลังจากแปลงเสียงเป็นข้อความ</p>
+                    </div>
+                    <div id="resultText" class="hidden"></div>
+                    <div id="processingIndicator" class="hidden text-center py-12">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-3"></div>
+                        <p class="text-gray-600">กำลังประมวลผลไฟล์เสียง...</p>
+                    </div>
+                </div>
+
+                <div id="confidenceMeter" class="mt-4 hidden">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-medium text-gray-700">ความแม่นยำ</span>
+                        <span class="text-sm font-medium text-gray-700" id="confidenceValue">85%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="confidenceBar" class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-gray-500 text-sm">
+            <p>© 2023 Speech to Text Converter. All rights reserved.</p>
+            <p class="mt-1">พัฒนาโดยใช้เทคโนโลยี Web Speech API</p>
+        </footer>
+    </div>
+
+    <script>
+        // DOM Elements
+        const recordTab = document.getElementById('recordTab');
+        const uploadTab = document.getElementById('uploadTab');
+        const recordPanel = document.getElementById('recordPanel');
+        const uploadPanel = document.getElementById('uploadPanel');
+        const recordBtn = document.getElementById('recordBtn');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const cancelUpload = document.getElementById('cancelUpload');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultText = document.getElementById('resultText');
+        const placeholderText = document.getElementById('placeholderText');
+        const processingIndicator = document.getElementById('processingIndicator');
+        const confidenceMeter = document.getElementById('confidenceMeter');
+        const confidenceValue = document.getElementById('confidenceValue');
+        const confidenceBar = document.getElementById('confidenceBar');
+        const copyText = document.getElementById('copyText');
+        const downloadText = document.getElementById('downloadText');
+        const wordCount = document.getElementById('wordCount');
+        const waveform = document.getElementById('waveform');
+        const currentTime = document.getElementById('currentTime');
+        const duration = document.getElementById('duration');
+
+        // Tab switching
+        recordTab.addEventListener('click', () => {
+            recordTab.classList.add('text-blue-600', 'border-blue-600');
+            recordTab.classList.remove('text-gray-500');
+            uploadTab.classList.add('text-gray-500');
+            uploadTab.classList.remove('text-blue-600', 'border-blue-600');
+            recordPanel.classList.remove('hidden');
+            uploadPanel.classList.add('hidden');
+        });
+
+        uploadTab.addEventListener('click', () => {
+            uploadTab.classList.add('text-blue-600', 'border-blue-600');
+            uploadTab.classList.remove('text-gray-500');
+            recordTab.classList.add('text-gray-500');
+            recordTab.classList.remove('text-blue-600', 'border-blue-600');
+            uploadPanel.classList.remove('hidden');
+            recordPanel.classList.add('hidden');
+        });
+
+        // File upload handling
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // Validate file
+                const validTypes = ['audio/mp3', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a'];
+                const maxSize = 10 * 1024 * 1024; // 10MB
+                
+                if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|ogg|m4a)$/i)) {
+                    showAlert('ประเภทไฟล์ไม่รองรับ', 'red');
+                    return;
+                }
+                
+                if (file.size > maxSize) {
+                    showAlert('ไฟล์มีขนาดใหญ่เกิน 10 MB', 'red');
+                    return;
+                }
+                
+                // Show file info
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.classList.remove('hidden');
+                
+                // Simulate upload progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 10;
+                    if (progress > 100) progress = 100;
+                    uploadProgress.style.width = `${progress}%`;
+                    
+                    if (progress === 100) {
+                        clearInterval(progressInterval);
+                        processAudioFile(file);
+                    }
+                }, 200);
+            }
+        });
+
+        cancelUpload.addEventListener('click', () => {
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            uploadProgress.style.width = '0%';
+        });
+
+        // Recording functionality
+        let isRecording = false;
+        let recognition;
+        let recordingTimer;
+        let recordingSeconds = 0;
+        
+        recordBtn.addEventListener('click', toggleRecording);
+        
+        function toggleRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+        
+        function startRecording() {
+            // Check browser support
+            if (!('webkitSpeechRecognition' in window)) {
+                showAlert('เบราว์เซอร์นี้ไม่รองรับการบันทึกเสียง', 'red');
+                return;
+            }
+            
+            // Initialize recognition
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'th-TH';
+            
+            // Event handlers
+            recognition.onstart = () => {
+                isRecording = true;
+                recordBtn.innerHTML = '<i class="fas fa-stop mr-2"></i> หยุดบันทึก';
+                recordBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                recordBtn.classList.add('bg-gray-700', 'hover:bg-gray-800');
+                placeholderText.classList.add('hidden');
+                resultText.classList.remove('hidden');
+                resultText.innerHTML = '<div class="subtitle-line text-center text-gray-500 pulse">กำลังฟัง... พูดตอนนี้</div>';
+                
+                // Start timer
+                recordingSeconds = 0;
+                updateTimer();
+                recordingTimer = setInterval(updateTimer, 1000);
+                
+                // Animate waveform
+                animateWaveform();
+            };
+            
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                // Format results
+                const timeStamp = formatTime(recordingSeconds);
+                let html = '';
+                
+                if (finalTranscript) {
+                    html += `<div class="subtitle-line mb-4">
+                                <div class="text-sm text-gray-500 mb-1">${timeStamp}</div>
+                                <div class="text-gray-800">${finalTranscript}</div>
+                            </div>`;
+                }
+                
+                if (interimTranscript) {
+                    html += `<div class="subtitle-line text-gray-500">${interimTranscript}</div>`;
+                }
+                
+                resultText.innerHTML = html;
+                updateWordCount();
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Recognition error:', event.error);
+                stopRecording();
+                showAlert('เกิดข้อผิดพลาดในการบันทึกเสียง: ' + event.error, 'red');
+            };
+            
+            recognition.onend = () => {
+                if (isRecording) {
+                    // Unexpected end
+                    stopRecording();
+                    showAlert('การบันทึกเสียงหยุดโดยไม่ได้ตั้งใจ', 'yellow');
+                }
+            };
+            
+            // Start recognition
+            recognition.start();
+        }
+        
+        function stopRecording() {
+            if (recognition) {
+                recognition.stop();
+            }
+            
+            isRecording = false;
+            clearInterval(recordingTimer);
+            clearInterval(waveformInterval);
+            
+            recordBtn.innerHTML = '<i class="fas fa-microphone mr-2"></i> เริ่มบันทึกเสียง';
+            recordBtn.classList.remove('bg-gray-700', 'hover:bg-gray-800');
+            recordBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+            
+            // Show confidence meter
+            const confidence = Math.floor(Math.random() * 20) + 80; // Random between 80-100%
+            confidenceValue.textContent = `${confidence}%`;
+            confidenceBar.style.width = `${confidence}%`;
+            confidenceMeter.classList.remove('hidden');
+            
+            // Update UI
+            updateWordCount();
+        }
+        
+        function updateTimer() {
+            recordingSeconds++;
+            const minutes = Math.floor(recordingSeconds / 60);
+            const seconds = recordingSeconds % 60;
+            currentTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Limit to 15 minutes (900 seconds)
+            if (recordingSeconds >= 900) {
+                stopRecording();
+                showAlert('ถึงระยะเวลาบันทึกสูงสุด 15 นาทีแล้ว', 'yellow');
+            }
+        }
+        
+        let waveformInterval;
+        function animateWaveform() {
+            let progress = 0;
+            waveformInterval = setInterval(() => {
+                progress = (progress + 5) % 100;
+                waveform.style.setProperty('--progress', `${progress}%`);
+            }, 100);
+        }
+        
+        // Helper functions
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function updateWordCount() {
+            const text = resultText.textContent || '';
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            wordCount.textContent = words;
+        }
+        
+        function showAlert(message, color) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg text-white font-medium ${
+                color === 'red' ? 'bg-red-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-blue-500'
+            }`;
+            alertDiv.innerHTML = `<i class="fas fa-${
+                color === 'red' ? 'exclamation-triangle' : 'info-circle'
+            } mr-2"></i> ${message}`;
+            
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
+        
+        function processAudioFile(file) {
+            placeholderText.classList.add('hidden');
+            processingIndicator.classList.remove('hidden');
+            resultText.classList.add('hidden');
+            
+            // Simulate processing delay
+            setTimeout(() => {
+                processingIndicator.classList.add('hidden');
+                resultText.classList.remove('hidden');
+                
+                // Generate mock transcription
+                const mockText = generateMockTranscription(file.name);
+                resultText.innerHTML = mockText;
+                
+                // Show confidence meter
+                const confidence = Math.floor(Math.random() * 20) + 75; // Random between 75-95%
+                confidenceValue.textContent = `${confidence}%`;
+                confidenceBar.style.width = `${confidence}%`;
+                confidenceMeter.classList.remove('hidden');
+                
+                updateWordCount();
+            }, 3000);
+        }
+        
+        function generateMockTranscription(filename) {
+            const thaiSentences = [
+                "สวัสดีครับ ยินดีต้อนรับสู่บริการแปลงเสียงเป็นข้อความ",
+                "วันนี้เราจะมาพูดถึงเทคโนโลยีการแปลงเสียงเป็นข้อความ",
+                "บริการนี้สามารถช่วยคุณแปลงไฟล์เสียงเป็นข้อความได้อย่างรวดเร็ว",
+                "คุณสามารถอัปโหลดไฟล์เสียงหรือบันทึกเสียงสดได้ทันที",
+                "ผลลัพธ์ที่ได้มีความแม่นยำสูงและใช้งานง่าย",
+                "ลองพูดหรืออัปโหลดไฟล์เสียงเพื่อทดสอบระบบกันเลย",
+                "เทคโนโลยีนี้พัฒนาขึ้นเพื่ออำนวยความสะดวกในการทำงาน",
+                "ไม่ว่าจะเป็นการบันทึกการประชุมหรือการถอดเทปสัมภาษณ์",
+                "ระบบรองรับภาษาไทยและภาษาอังกฤษ",
+                "ขอบคุณที่ใช้บริการของเรา"
+            ];
+            
+            let html = '';
+            let currentTime = 0;
+            
+            for (let i = 0; i < 5 + Math.floor(Math.random() * 5); i++) {
+                const sentence = thaiSentences[Math.floor(Math.random() * thaiSentences.length)];
+                const duration = 2 + Math.random() * 3; // 2-5 seconds per sentence
+                
+                const startTime = formatTimeForSubtitle(currentTime);
+                currentTime += duration;
+                const endTime = formatTimeForSubtitle(currentTime);
+                
+                html += `<div class="subtitle-line mb-4">
+                            <div class="text-sm text-gray-500 mb-1">${startTime} --> ${endTime}</div>
+                            <div class="text-gray-800">${sentence}</div>
+                        </div>`;
+            }
+            
+            return html;
+        }
+        
+        function formatTimeForSubtitle(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 1000);
+            
+            return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+        }
+        
+        // Copy and download functionality
+        copyText.addEventListener('click', () => {
+            const textToCopy = resultText.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showAlert('คัดลอกข้อความเรียบร้อยแล้ว', 'blue');
+            });
+        });
+        
+        downloadText.addEventListener('click', () => {
+            const textToDownload = resultText.textContent;
+            const blob = new Blob([textToDownload], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'transcription.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showAlert('ดาวน์โหลดไฟล์ข้อความเรียบร้อยแล้ว', 'blue');
+        });
+        
+        // Initialize duration display
+        duration.textContent = '15:00';
+    </script>
+</body>
+</html>
